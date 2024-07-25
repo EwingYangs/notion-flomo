@@ -8,3 +8,4 @@ html2notion
 markdownify
 mistletoe
 md2notion
+html2text
