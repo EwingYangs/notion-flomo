@@ -1,5 +1,6 @@
 import os
 import random
+import time
 
 import html2text
 from markdownify import markdownify
@@ -84,7 +85,15 @@ class Flomo2Notion:
     def sync_to_notion(self):
         # 1. 调用flomo web端的api从flomo获取数据
         authorization = os.getenv("FLOMO_TOKEN")
-        memo_list = self.flomo_api.get_memo_list(authorization)
+        memo_list = []
+        latest_updated_at = "0"
+
+        while True:
+            new_memo_list = self.flomo_api.get_memo_list(authorization, latest_updated_at)
+            if not new_memo_list:
+                break
+            memo_list.extend(new_memo_list)
+            latest_updated_at = str(int(time.mktime(time.strptime(new_memo_list[-1]['updated_at'], "%Y-%m-%d %H:%M:%S"))))
 
         # 2. 调用notion api获取数据库存在的记录，用slug标识唯一，如果存在则更新，不存在则写入
         notion_memo_list = self.notion_helper.query_all(self.notion_helper.page_id)

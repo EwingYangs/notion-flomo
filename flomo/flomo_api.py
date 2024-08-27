@@ -27,14 +27,16 @@ class FlomoApi:
     def __int__(self):
         pass
 
-    def get_memo_list(self, user_authorization):
+    def get_memo_list(self, user_authorization, latest_updated_at="0"):
         # 获取当前时间
         current_timestamp = int(time.time())
+
+        latest_updated_at = str(int(latest_updated_at) + 1)
 
         # 构造参数
         params = {
             'limit': '200',
-            'latest_updated_at': '0',
+            'latest_updated_at': latest_updated_at,
             'tz': '8:0',
             'timestamp': current_timestamp,
             'api_key': 'flomo_web',
