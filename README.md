@@ -1,5 +1,8 @@
-# 将flomo同步到Notion
+# 官网开启一键同步
 
+[MemoHub](https://memohub.notionify.net)
+
+# 将flomo同步到Notion
 
 本项目通过Github Action每天定时同步flomo到Notion。
 
