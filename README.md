@@ -1,6 +1,7 @@
 # 官网开启一键同步
 
-[MemoHub](https://memohub.notionify.net)
+如果你觉得部署繁琐，可以直接使用NotesToNotion
+[NotesToNotion](https://memohub.notionify.net)
 
 # 将flomo同步到Notion
 
