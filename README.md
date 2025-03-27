@@ -18,7 +18,7 @@
 ### 2023年更新
 - 初始版本发布
 
-### 2024年更新
+### 2025年更新
 - 修复了rich_text数组为空导致索引错误的问题
 - 修复了Notion选项中不允许使用逗号的问题（将逗号自动替换为破折号）
 - 修复了特殊格式（如[OK][捂脸]等表情符号）导致Markdown解析错误的问题
@@ -41,6 +41,59 @@
 7. 设置环境变量`CLEAN_UNMATCHED=true`可以删除不符合标签条件的记录，保持Notion数据库整洁
 
 ## 高级用法
+
+### GitHub Actions环境变量配置
+
+本工具通过GitHub Actions自动运行，需要在GitHub仓库中设置以下环境变量（Secrets）：
+
+#### 必需的环境变量
+
+1. **NOTION_TOKEN**：Notion API的访问令牌
+   - 在[Notion开发者页面](https://www.notion.so/my-integrations)创建一个集成，获取令牌
+
+2. **NOTION_PAGE**：Notion数据库的URL或ID
+   - 复制Notion数据库页面的URL，或者仅复制URL中的数据库ID部分
+
+3. **FLOMO_TOKEN**：Flomo的API访问令牌
+   - 从Flomo网页版获取
+
+#### 可选的环境变量
+
+4. **SYNC_TAGS**：要同步的标签列表
+   - 多个标签用逗号分隔，例如：`得到,创业想法,读书笔记`
+   - 如果不设置此变量，将同步所有备忘录（包括没有标签的）
+   - 使用包含匹配方式，例如设置`读书`会匹配"读书笔记"、"读书心得"等包含该关键词的标签
+
+5. **CLEAN_UNMATCHED**：是否清理不符合标签条件的记录
+   - 设置为`true`将删除Notion中不符合当前标签条件的记录
+   - 默认为`false`
+   - 建议与`SYNC_TAGS`配合使用，确保只保留符合条件的记录
+
+6. **FULL_UPDATE**：是否进行全量更新
+   - 设置为`true`将同步所有符合条件的备忘录，不考虑更新时间
+   - 默认为`false`，只同步最近一段时间内更新的备忘录
+   - 适合首次运行或需要完全重建Notion数据库时使用
+
+7. **UPDATE_INTERVAL_DAY**：更新间隔天数
+   - 指定只同步最近多少天内更新的备忘录
+   - 默认为`7`，表示只同步最近7天内更新的备忘录
+   - 当`FULL_UPDATE=true`时此设置无效
+
+#### 设置方法
+
+1. 在GitHub仓库页面，进入"Settings" > "Secrets and variables" > "Actions"
+2. 点击"New repository secret"按钮
+3. 添加上述环境变量，填入对应的值
+4. 点击"Add secret"保存
+
+示例配置：
+- `NOTION_TOKEN`: `secret_abcdefg123456789`
+- `NOTION_PAGE`: `https://www.notion.so/1c3a7fffb36e80ffa215cd9fbf1fa332`
+- `FLOMO_TOKEN`: `123456|abcdefg123456789`
+- `SYNC_TAGS`: `得到,创业想法`
+- `CLEAN_UNMATCHED`: `true`
+- `FULL_UPDATE`: `true`
+- `UPDATE_INTERVAL_DAY`: `30`
 
 ### 按标签过滤同步
 
