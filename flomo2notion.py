@@ -25,7 +25,9 @@ class Flomo2Notion:
     def __init__(self):
         self.flomo_api = FlomoApi()
         self.notion_helper = NotionHelper()
-        self.uploader = Md2NotionUploader()
+        
+        # 配置图片上传，使用直接外链方式
+        self.uploader = Md2NotionUploader(image_host='direct')
 
     def get_emoji_for_tags(self, tags):
         """根据标签获取对应的emoji图标"""
@@ -44,10 +46,17 @@ class Flomo2Notion:
 
     def process_content(self, html_content):
         """预处理HTML内容，移除或替换可能导致Markdown解析问题的元素"""
+        # 保护图片标签，避免被错误替换
+        protected_content = re.sub(r'(<img\s+[^>]*>)', r'PROTECTED_IMG_TAG\1PROTECTED_IMG_TAG', html_content)
+        
         # 替换 [XX][YY] 格式的文本，这种格式容易被误认为是Markdown链接或脚注
-        processed = re.sub(r'\[([^\]]+)\]\[([^\]]+)\]', r'【\1】【\2】', html_content)
-        # 替换其他可能导致问题的模式
-        processed = re.sub(r'\[([^\]]+)\]', r'【\1】', processed)
+        processed = re.sub(r'\[([^\]]+)\]\[([^\]]+)\]', r'【\1】【\2】', protected_content)
+        # 替换其他可能导致问题的模式，但排除被保护的图片标签
+        processed = re.sub(r'(?<!PROTECTED_IMG_TAG)\[([^\]]+)\](?!PROTECTED_IMG_TAG)', r'【\1】', processed)
+        
+        # 还原被保护的图片标签
+        processed = processed.replace('PROTECTED_IMG_TAG', '')
+        
         return processed
 
     def insert_memo(self, memo):
@@ -211,8 +220,13 @@ class Flomo2Notion:
             memo_list.extend(new_memo_list)
             latest_updated_at = str(int(time.mktime(time.strptime(new_memo_list[-1]['updated_at'], "%Y-%m-%d %H:%M:%S"))))
 
+        # 创建一个字典，用于快速查找flomo备忘录的slug
+        flomo_slugs = {memo['slug']: memo for memo in memo_list}
+
         # 获取需要同步的标签列表，如果未设置则同步所有标签
         sync_tags = os.getenv("SYNC_TAGS", "")
+        should_clean_unmatched = os.getenv("CLEAN_UNMATCHED", "false").lower() == "true"
+        
         if sync_tags:
             # 将标签字符串分割成列表，并去除空格
             sync_tags_list = [tag.strip() for tag in sync_tags.split(',')]
@@ -221,16 +235,43 @@ class Flomo2Notion:
             filtered_memo_list = []
             for memo in memo_list:
                 # 检查备忘录的标签是否与指定标签有交集
-                if any(tag in memo['tags'] for tag in sync_tags_list):
+                if any(sync_tag in tag for sync_tag in sync_tags_list for tag in memo['tags']):
                     filtered_memo_list.append(memo)
+            
+            print(f"过滤前备忘录数量: {len(memo_list)}")
             memo_list = filtered_memo_list
             print(f"过滤后备忘录数量: {len(memo_list)}")
+            
+            # 创建过滤后的slug字典，用于后续检查
+            filtered_slugs = {memo['slug']: memo for memo in memo_list}
 
         # 2. 调用notion api获取数据库存在的记录，用slug标识唯一，如果存在则更新，不存在则写入
         notion_memo_list = self.notion_helper.query_all(self.notion_helper.page_id)
         slug_map = {}
         for notion_memo in notion_memo_list:
-            slug_map[notion_utils.get_rich_text_from_result(notion_memo, "slug")] = notion_memo.get("id")
+            slug = notion_utils.get_rich_text_from_result(notion_memo, "slug")
+            if slug:  # 确保slug不为空
+                slug_map[slug] = notion_memo.get("id")
+        
+        # 如果设置了CLEAN_UNMATCHED且指定了同步标签，则删除不符合标签条件的记录
+        if sync_tags and should_clean_unmatched:
+            print("检查并删除不符合标签条件的记录...")
+            records_to_delete = []
+            for slug, page_id in slug_map.items():
+                # 如果这个slug在flomo中不存在，或者在flomo中但不在过滤后的列表中
+                if slug not in flomo_slugs or slug not in filtered_slugs:
+                    records_to_delete.append((slug, page_id))
+            
+            print(f"将删除 {len(records_to_delete)} 条不符合条件的记录")
+            for slug, page_id in records_to_delete:
+                try:
+                    print(f"删除页面: {slug}")
+                    self.notion_helper.client.pages.update(
+                        page_id=page_id,
+                        archived=True  # 在Notion API中，archived=True表示删除页面
+                    )
+                except Exception as e:
+                    print(f"删除页面 {slug} 时出错: {e}")
 
         # 3. 轮询flomo的列表数据
         for memo in memo_list:

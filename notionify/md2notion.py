@@ -64,6 +64,16 @@ class Md2NotionUploader:
                 })
             elif part.startswith('![') and '](' in part:
                 caption, url = re.match(r'!\[(.*?)\]\((.*?)\)', part).groups()
+                # 处理URL中可能的转义字符
+                url = url.replace('\\', '')
+                # 确保URL格式正确
+                if not url.startswith(('http://', 'https://')):
+                    if url.startswith('//'):
+                        url = 'https:' + url
+                    elif url.startswith('/'):
+                        url = 'https:/' + url
+                
+                print(f"Processing image URL: {url}")
                 url = self.convert_to_oneline_url(url)
                 result.append({
                     "image": {
@@ -134,8 +144,11 @@ class Md2NotionUploader:
             return self.convert_to_oneline_url_smms(url)
         elif self.image_host == 'aliyun':
             return self.convert_to_oneline_url_aliyun(url)
+        elif self.image_host == 'direct':
+            # 直接使用URL，不做转换
+            return url
         else:
-            raise "Invalid Image Hosting"
+            raise Exception(f"Invalid Image Hosting: {self.image_host}")
 
     def convert_to_oneline_url_onedrive(self, url):
         if os.path.exists(url):
