@@ -1,6 +1,7 @@
 import os
 import random
 import time
+import re
 
 import html2text
 from markdownify import markdownify
@@ -19,11 +20,22 @@ class Flomo2Notion:
         self.notion_helper = NotionHelper()
         self.uploader = Md2NotionUploader()
 
+    def process_content(self, html_content):
+        """预处理HTML内容，移除或替换可能导致Markdown解析问题的元素"""
+        # 替换 [XX][YY] 格式的文本，这种格式容易被误认为是Markdown链接或脚注
+        processed = re.sub(r'\[([^\]]+)\]\[([^\]]+)\]', r'【\1】【\2】', html_content)
+        # 替换其他可能导致问题的模式
+        processed = re.sub(r'\[([^\]]+)\]', r'【\1】', processed)
+        return processed
+
     def insert_memo(self, memo):
         print("insert_memo:", memo)
-        content_md = markdownify(memo['content'])
+
+        # 预处理内容，处理可能导致问题的格式
+        processed_content = self.process_content(memo['content'])
+        content_md = markdownify(processed_content)
         parent = {"database_id": self.notion_helper.page_id, "type": "database_id"}
-        content_text = html2text.html2text(memo['content'])
+        content_text = html2text.html2text(processed_content)
         properties = {
             "标题": notion_utils.get_title(
                 truncate_string(content_text)
@@ -53,14 +65,52 @@ class Flomo2Notion:
         )
 
         # 在page里面添加content
-        self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+        try:
+            self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+        except Exception as e:
+            print(f"Error uploading content: {e}")
+            # 发生错误时，尝试使用纯文本块
+            from html.parser import HTMLParser
+            
+            class MLStripper(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.reset()
+                    self.strict = False
+                    self.convert_charrefs= True
+                    self.text = []
+                def handle_data(self, d):
+                    self.text.append(d)
+                def get_data(self):
+                    return ''.join(self.text)
+                    
+            def strip_tags(html):
+                s = MLStripper()
+                s.feed(html)
+                return s.get_data()
+                
+            plain_text = strip_tags(memo['content'])
+            self.notion_helper.client.blocks.children.append(
+                block_id=page['id'],
+                children=[
+                    {
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [{"type": "text", "text": {"content": plain_text}}]
+                        }
+                    }
+                ]
+            )
 
     def update_memo(self, memo, page_id):
         print("update_memo:", memo)
 
-        content_md = markdownify(memo['content'])
+        # 预处理内容，处理可能导致问题的格式
+        processed_content = self.process_content(memo['content'])
+        content_md = markdownify(processed_content)
         # 只更新内容
-        content_text = html2text.html2text(memo['content'])
+        content_text = html2text.html2text(processed_content)
         properties = {
             "标题": notion_utils.get_title(
                 truncate_string(content_text)
@@ -77,7 +127,43 @@ class Flomo2Notion:
         # 先清空page的内容，再重新写入
         self.notion_helper.clear_page_content(page["id"])
 
-        self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+        try:
+            self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+        except Exception as e:
+            print(f"Error uploading content: {e}")
+            # 发生错误时，尝试使用纯文本块
+            from html.parser import HTMLParser
+            
+            class MLStripper(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.reset()
+                    self.strict = False
+                    self.convert_charrefs= True
+                    self.text = []
+                def handle_data(self, d):
+                    self.text.append(d)
+                def get_data(self):
+                    return ''.join(self.text)
+                    
+            def strip_tags(html):
+                s = MLStripper()
+                s.feed(html)
+                return s.get_data()
+                
+            plain_text = strip_tags(memo['content'])
+            self.notion_helper.client.blocks.children.append(
+                block_id=page['id'],
+                children=[
+                    {
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [{"type": "text", "text": {"content": plain_text}}]
+                        }
+                    }
+                ]
+            )
 
     # 具体步骤：
     # 1. 调用flomo web端的api从flomo获取数据
