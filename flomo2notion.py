@@ -231,12 +231,23 @@ class Flomo2Notion:
             # 将标签字符串分割成列表，并去除空格
             sync_tags_list = [tag.strip() for tag in sync_tags.split(',')]
             print(f"只同步包含以下标签的备忘录: {sync_tags_list}")
+            
             # 过滤备忘录列表，只保留包含指定标签的
             filtered_memo_list = []
             for memo in memo_list:
-                # 检查备忘录的标签是否与指定标签有交集
-                if any(sync_tag in tag for sync_tag in sync_tags_list for tag in memo['tags']):
+                # 首先检查备忘录是否有标签
+                if not memo['tags'] or len(memo['tags']) == 0:
+                    print(f"跳过无标签备忘录: {memo['slug']}")
+                    continue
+                
+                # 使用包含匹配：标签中包含子字符串即可
+                match_found = any(any(sync_tag in tag for sync_tag in sync_tags_list) for tag in memo['tags'])
+                
+                if match_found:
                     filtered_memo_list.append(memo)
+                    print(f"匹配标签: {memo['tags']}")
+                else:
+                    print(f"不匹配标签: {memo['tags']}")
             
             print(f"过滤前备忘录数量: {len(memo_list)}")
             memo_list = filtered_memo_list
