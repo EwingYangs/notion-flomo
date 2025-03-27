@@ -59,7 +59,9 @@ def get_file(url):
 
 
 def get_multi_select(names):
-    return {"multi_select": [{"name": name} for name in names]}
+    # 处理可能含有逗号的标签名
+    sanitized_names = [name.replace(',', '-') for name in names]
+    return {"multi_select": [{"name": name} for name in sanitized_names]}
 
 
 def get_relation(ids):
@@ -81,7 +83,9 @@ def get_icon(url):
 
 
 def get_select(name):
-    return {"select": {"name": name}}
+    # 处理可能含有逗号的选项名
+    sanitized_name = name.replace(',', '-') if name else name
+    return {"select": {"name": sanitized_name}}
 
 
 def get_number(number):
