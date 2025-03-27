@@ -60,7 +60,7 @@
 #### 可选的环境变量
 
 4. **SYNC_TAGS**：要同步的标签列表
-   - 多个标签用逗号分隔，例如：`得到,创业想法,读书笔记`
+   - 多个标签用逗号分隔，例如：`得到,读书笔记`
    - 如果不设置此变量，将同步所有备忘录（包括没有标签的）
    - 使用包含匹配方式，例如设置`读书`会匹配"读书笔记"、"读书心得"等包含该关键词的标签
 
@@ -88,9 +88,9 @@
 
 示例配置：
 - `NOTION_TOKEN`: `secret_abcdefg123456789`
-- `NOTION_PAGE`: `https://www.notion.so/1c3a7fffb36e80ffa215cd9fbf1fa332`
+- `NOTION_PAGE`: `https://www.notion.so/1234578936e80ffa215cd9fbf1fa332`
 - `FLOMO_TOKEN`: `123456|abcdefg123456789`
-- `SYNC_TAGS`: `得到,创业想法`
+- `SYNC_TAGS`: `得到,读书笔记`
 - `CLEAN_UNMATCHED`: `true`
 - `FULL_UPDATE`: `true`
 - `UPDATE_INTERVAL_DAY`: `30`
