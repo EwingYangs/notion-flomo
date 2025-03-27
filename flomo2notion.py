@@ -1,5 +1,4 @@
 import os
-import random
 import time
 import re
 
@@ -9,16 +8,53 @@ from markdownify import markdownify
 from flomo.flomo_api import FlomoApi
 from notionify import notion_utils
 from notionify.md2notion import Md2NotionUploader
-from notionify.notion_cover_list import cover
 from notionify.notion_helper import NotionHelper
 from utils import truncate_string, is_within_n_days
 
+# 标签对应的emoji映射，可以根据需要扩展
+TAG_EMOJI_MAP = {
+    "重要": "🔥",
+    "工作": "💼",
+    "学习": "📚",
+    "阅读": "📖",
+    "笔记": "📝",
+    "计划": "📅",
+    "想法": "💡",
+    "日记": "📔",
+    "健康": "💪",
+    "旅行": "✈️",
+    "美食": "🍔",
+    "电影": "🎬",
+    "音乐": "🎵",
+    "项目": "📊",
+    "问题": "❓",
+    "解决": "✅",
+    # 添加更多标签和对应的emoji
+}
+
+# 默认emoji，当没有匹配的标签时使用
+DEFAULT_EMOJI = "📌"
 
 class Flomo2Notion:
     def __init__(self):
         self.flomo_api = FlomoApi()
         self.notion_helper = NotionHelper()
         self.uploader = Md2NotionUploader()
+
+    def get_emoji_for_tags(self, tags):
+        """根据标签获取对应的emoji图标"""
+        if not tags or len(tags) == 0:
+            return DEFAULT_EMOJI
+        
+        # 尝试使用第一个标签匹配emoji
+        first_tag = tags[0]
+        # 检查是否有精确匹配
+        for tag, emoji in TAG_EMOJI_MAP.items():
+            if tag in first_tag:
+                return emoji
+        
+        # 如果没有匹配到，返回默认emoji
+        return DEFAULT_EMOJI
 
     def process_content(self, html_content):
         """预处理HTML内容，移除或替换可能导致Markdown解析问题的元素"""
@@ -54,13 +90,12 @@ class Flomo2Notion:
             "链接数量": notion_utils.get_number(memo['linked_count']),
         }
 
-        random_cover = random.choice(cover)
-        print(f"Random element: {random_cover}")
+        # 获取标签对应的emoji
+        emoji = self.get_emoji_for_tags(memo['tags'])
 
         page = self.notion_helper.client.pages.create(
             parent=parent,
-            icon=notion_utils.get_icon("https://www.notion.so/icons/target_red.svg"),
-            cover=notion_utils.get_icon(random_cover),
+            icon={"type": "emoji", "emoji": emoji},
             properties=properties,
         )
 
@@ -122,7 +157,16 @@ class Flomo2Notion:
             ),
             "是否置顶": notion_utils.get_select("否" if memo['pin'] == 0 else "是"),
         }
-        page = self.notion_helper.client.pages.update(page_id=page_id, properties=properties)
+        
+        # 获取标签对应的emoji
+        emoji = self.get_emoji_for_tags(memo['tags'])
+        
+        # 更新页面属性和图标
+        page = self.notion_helper.client.pages.update(
+            page_id=page_id, 
+            properties=properties,
+            icon={"type": "emoji", "emoji": emoji}
+        )
 
         # 先清空page的内容，再重新写入
         self.notion_helper.clear_page_content(page["id"])
@@ -180,6 +224,21 @@ class Flomo2Notion:
                 break
             memo_list.extend(new_memo_list)
             latest_updated_at = str(int(time.mktime(time.strptime(new_memo_list[-1]['updated_at'], "%Y-%m-%d %H:%M:%S"))))
+
+        # 获取需要同步的标签列表，如果未设置则同步所有标签
+        sync_tags = os.getenv("SYNC_TAGS", "")
+        if sync_tags:
+            # 将标签字符串分割成列表，并去除空格
+            sync_tags_list = [tag.strip() for tag in sync_tags.split(',')]
+            print(f"只同步包含以下标签的备忘录: {sync_tags_list}")
+            # 过滤备忘录列表，只保留包含指定标签的
+            filtered_memo_list = []
+            for memo in memo_list:
+                # 检查备忘录的标签是否与指定标签有交集
+                if any(tag in memo['tags'] for tag in sync_tags_list):
+                    filtered_memo_list.append(memo)
+            memo_list = filtered_memo_list
+            print(f"过滤后备忘录数量: {len(memo_list)}")
 
         # 2. 调用notion api获取数据库存在的记录，用slug标识唯一，如果存在则更新，不存在则写入
         notion_memo_list = self.notion_helper.query_all(self.notion_helper.page_id)
