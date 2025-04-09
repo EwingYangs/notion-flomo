@@ -1,7 +1,8 @@
 # 官网开启一键同步
 
 如果你觉得部署繁琐，可以直接使用NotesToNotion
-[NotesToNotion](https://memohub.notionify.net)
+NotesToNotion能同步图片，并且删除和更新的也可以同步
+[NotesToNotion](https://notes2notion.notionify.net)
 
 # 将flomo同步到Notion
 
