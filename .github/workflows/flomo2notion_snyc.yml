@@ -15,10 +15,6 @@ jobs:
       NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
       NOTION_PAGE: ${{ secrets.NOTION_PAGE }}
       FLOMO_TOKEN: ${{ secrets.FLOMO_TOKEN }}
-      SYNC_TAGS: ${{ secrets.SYNC_TAGS }}
-      CLEAN_UNMATCHED: ${{ secrets.CLEAN_UNMATCHED }}
-      FULL_UPDATE: ${{ secrets.FULL_UPDATE }}
-      UPDATE_INTERVAL_DAY: ${{ secrets.UPDATE_INTERVAL_DAY }}
       REF: ${{ github.ref }}
       REPOSITORY: ${{ github.repository }}
     steps:

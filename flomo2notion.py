@@ -11,15 +11,22 @@ from notionify.md2notion import Md2NotionUploader
 from notionify.notion_helper import NotionHelper
 from utils import truncate_string, is_within_n_days
 
-# 标签对应的emoji映射，可以根据需要扩展
-TAG_EMOJI_MAP = {
-    "得到": "📚",
-    "创业想法": "💡",
-    # 添加更多标签和对应的emoji
-}
-
-# 默认emoji，当没有匹配的标签时使用
-DEFAULT_EMOJI = "📌"
+try:
+    from config import (
+        SYNC_TAGS as CONFIG_SYNC_TAGS,
+        CLEAN_UNMATCHED as CONFIG_CLEAN_UNMATCHED,
+        FULL_UPDATE as CONFIG_FULL_UPDATE,
+        UPDATE_INTERVAL_DAY as CONFIG_UPDATE_INTERVAL_DAY,
+        TAG_EMOJI_MAP as CONFIG_TAG_EMOJI_MAP,
+        DEFAULT_EMOJI as CONFIG_DEFAULT_EMOJI
+    )
+except ImportError:
+    CONFIG_SYNC_TAGS = None
+    CONFIG_CLEAN_UNMATCHED = None
+    CONFIG_FULL_UPDATE = None
+    CONFIG_UPDATE_INTERVAL_DAY = None
+    CONFIG_TAG_EMOJI_MAP = None
+    CONFIG_DEFAULT_EMOJI = None
 
 class Flomo2Notion:
     def __init__(self):
@@ -28,21 +35,30 @@ class Flomo2Notion:
         
         # 配置图片上传，使用直接外链方式
         self.uploader = Md2NotionUploader(image_host='direct')
+        
+        # 从配置文件或环境变量获取emoji映射
+        self.tag_emoji_map = CONFIG_TAG_EMOJI_MAP if CONFIG_TAG_EMOJI_MAP is not None else {
+            "得到": "📚",
+            "创业想法": "💡",
+        }
+        
+        # 从配置文件或环境变量获取默认emoji
+        self.default_emoji = CONFIG_DEFAULT_EMOJI if CONFIG_DEFAULT_EMOJI is not None else "📌"
 
     def get_emoji_for_tags(self, tags):
         """根据标签获取对应的emoji图标"""
         if not tags or len(tags) == 0:
-            return DEFAULT_EMOJI
+            return self.default_emoji
         
         # 尝试使用第一个标签匹配emoji
         first_tag = tags[0]
         # 检查是否有精确匹配
-        for tag, emoji in TAG_EMOJI_MAP.items():
+        for tag, emoji in self.tag_emoji_map.items():
             if tag in first_tag:
                 return emoji
         
         # 如果没有匹配到，返回默认emoji
-        return DEFAULT_EMOJI
+        return self.default_emoji
 
     def process_content(self, html_content):
         """预处理HTML内容，移除或替换可能导致Markdown解析问题的元素"""
@@ -266,9 +282,9 @@ class Flomo2Notion:
         # 创建一个字典，用于快速查找flomo备忘录的slug
         flomo_slugs = {memo['slug']: memo for memo in memo_list}
 
-        # 获取需要同步的标签列表，如果未设置则同步所有标签
-        sync_tags = os.getenv("SYNC_TAGS", "")
-        should_clean_unmatched = os.getenv("CLEAN_UNMATCHED", "false").lower() == "true"
+        # 获取需要同步的标签列表，优先使用本地配置文件中的设置
+        sync_tags = CONFIG_SYNC_TAGS if CONFIG_SYNC_TAGS is not None else os.getenv("SYNC_TAGS", "")
+        should_clean_unmatched = CONFIG_CLEAN_UNMATCHED if CONFIG_CLEAN_UNMATCHED is not None else os.getenv("CLEAN_UNMATCHED", "false").lower() == "true"
         
         if sync_tags:
             # 将标签字符串分割成列表，并去除空格
@@ -332,9 +348,9 @@ class Flomo2Notion:
             # 3.1 判断memo的slug是否存在，不存在则写入
             # 3.2 防止大批量更新，只更新更新时间为制定时间的数据（默认为7天）
             if memo['slug'] in slug_map.keys():
-                # 是否全量更新，默认否
-                full_update = os.getenv("FULL_UPDATE", False)
-                interval_day = os.getenv("UPDATE_INTERVAL_DAY", 7)
+                # 是否全量更新，优先使用配置文件中的设置
+                full_update = CONFIG_FULL_UPDATE if CONFIG_FULL_UPDATE is not None else os.getenv("FULL_UPDATE", False)
+                interval_day = CONFIG_UPDATE_INTERVAL_DAY if CONFIG_UPDATE_INTERVAL_DAY is not None else int(os.getenv("UPDATE_INTERVAL_DAY", 7))
                 if not full_update and not is_within_n_days(memo['updated_at'], interval_day):
                     print("is_within_n_days slug:", memo['slug'])
                     continue
