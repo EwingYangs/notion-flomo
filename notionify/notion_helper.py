@@ -1,5 +1,6 @@
 import logging
 import os
+import httpx
 
 from dotenv import load_dotenv
 from notion_client import Client
@@ -9,17 +10,33 @@ from notionify.notion_utils import extract_page_id
 
 load_dotenv()
 
+def should_retry(exception):
+    """判断是否应该重试的函数"""
+    retry_exceptions = (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.RequestError)
+    return isinstance(exception, retry_exceptions)
 
 class NotionHelper:
     database_id_dict = {}
     heatmap_block_id = None
 
     def __init__(self):
-        self.client = Client(auth=os.getenv("NOTION_TOKEN"), log_level=logging.ERROR)
+        # 设置较长的超时时间
+        self.client = Client(
+            auth=os.getenv("NOTION_TOKEN"),
+            log_level=logging.ERROR,
+            client_kwargs={
+                "timeout": httpx.Timeout(60.0, read=300.0)  # 连接超时60秒，读取超时300秒
+            }
+        )
         self.page_id = extract_page_id(os.getenv("NOTION_PAGE"))
         self.__cache = {}
 
-    @retry(stop_max_attempt_number=3, wait_fixed=5000)
+    @retry(
+        stop_max_attempt_number=5,  # 最多重试5次
+        wait_exponential_multiplier=1000,  # 初始等待1秒，之后指数增长
+        wait_exponential_max=60000,  # 最长等待60秒
+        retry_on_exception=should_retry  # 只在特定异常时重试
+    )
     def clear_page_content(self, page_id):
         # 获取页面的块内容
         result = self.client.blocks.children.list(page_id)

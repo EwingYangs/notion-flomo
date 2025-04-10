@@ -136,73 +136,116 @@ class Flomo2Notion:
     def update_memo(self, memo, page_id):
         print("update_memo:", memo)
 
-        # 预处理内容，处理可能导致问题的格式
-        processed_content = self.process_content(memo['content'])
-        content_md = markdownify(processed_content)
-        # 只更新内容
-        content_text = html2text.html2text(processed_content)
-        properties = {
-            "标题": notion_utils.get_title(
-                truncate_string(content_text)
-            ),
-            "更新时间": notion_utils.get_date(memo['updated_at']),
-            "链接数量": notion_utils.get_number(memo['linked_count']),
-            "标签": notion_utils.get_multi_select(
-                memo['tags']
-            ),
-            "是否置顶": notion_utils.get_select("否" if memo['pin'] == 0 else "是"),
-        }
-        
-        # 获取标签对应的emoji
-        emoji = self.get_emoji_for_tags(memo['tags'])
-        
-        # 更新页面属性和图标
-        page = self.notion_helper.client.pages.update(
-            page_id=page_id, 
-            properties=properties,
-            icon={"type": "emoji", "emoji": emoji}
-        )
-
-        # 先清空page的内容，再重新写入
-        self.notion_helper.clear_page_content(page["id"])
-
         try:
-            self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
-        except Exception as e:
-            print(f"Error uploading content: {e}")
-            # 发生错误时，尝试使用纯文本块
-            from html.parser import HTMLParser
+            # 预处理内容，处理可能导致问题的格式
+            processed_content = self.process_content(memo['content'])
+            content_md = markdownify(processed_content)
+            # 只更新内容
+            content_text = html2text.html2text(processed_content)
+            properties = {
+                "标题": notion_utils.get_title(
+                    truncate_string(content_text)
+                ),
+                "更新时间": notion_utils.get_date(memo['updated_at']),
+                "链接数量": notion_utils.get_number(memo['linked_count']),
+                "标签": notion_utils.get_multi_select(
+                    memo['tags']
+                ),
+                "是否置顶": notion_utils.get_select("否" if memo['pin'] == 0 else "是"),
+            }
             
-            class MLStripper(HTMLParser):
-                def __init__(self):
-                    super().__init__()
-                    self.reset()
-                    self.strict = False
-                    self.convert_charrefs= True
-                    self.text = []
-                def handle_data(self, d):
-                    self.text.append(d)
-                def get_data(self):
-                    return ''.join(self.text)
-                    
-            def strip_tags(html):
-                s = MLStripper()
-                s.feed(html)
-                return s.get_data()
-                
-            plain_text = strip_tags(memo['content'])
-            self.notion_helper.client.blocks.children.append(
-                block_id=page['id'],
-                children=[
-                    {
-                        "object": "block",
-                        "type": "paragraph",
-                        "paragraph": {
-                            "rich_text": [{"type": "text", "text": {"content": plain_text}}]
-                        }
-                    }
-                ]
+            # 获取标签对应的emoji
+            emoji = self.get_emoji_for_tags(memo['tags'])
+            
+            # 更新页面属性和图标
+            page = self.notion_helper.client.pages.update(
+                page_id=page_id, 
+                properties=properties,
+                icon={"type": "emoji", "emoji": emoji}
             )
+
+            # 先清空page的内容，再重新写入
+            self.notion_helper.clear_page_content(page["id"])
+
+            try:
+                # 将内容分成较小的块进行处理
+                MAX_BLOCK_SIZE = 5000  # 每块最大字符数
+                content_blocks = []
+                
+                # 如果内容较短，直接处理
+                if len(content_md) <= MAX_BLOCK_SIZE:
+                    self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+                else:
+                    # 将内容分块处理
+                    lines = content_md.split('\n')
+                    current_block = []
+                    current_size = 0
+                    
+                    for line in lines:
+                        line_size = len(line) + 1  # +1 for newline
+                        if current_size + line_size > MAX_BLOCK_SIZE:
+                            # 处理当前块
+                            block_content = '\n'.join(current_block)
+                            self.uploader.uploadSingleFileContent(
+                                self.notion_helper.client,
+                                block_content,
+                                page['id']
+                            )
+                            # 重置块
+                            current_block = [line]
+                            current_size = line_size
+                        else:
+                            current_block.append(line)
+                            current_size += line_size
+                    
+                    # 处理最后一个块
+                    if current_block:
+                        block_content = '\n'.join(current_block)
+                        self.uploader.uploadSingleFileContent(
+                            self.notion_helper.client,
+                            block_content,
+                            page['id']
+                        )
+                        
+            except Exception as e:
+                print(f"Error uploading content: {e}")
+                # 发生错误时，尝试使用纯文本块
+                from html.parser import HTMLParser
+                
+                class MLStripper(HTMLParser):
+                    def __init__(self):
+                        super().__init__()
+                        self.reset()
+                        self.strict = False
+                        self.convert_charrefs= True
+                        self.text = []
+                    def handle_data(self, d):
+                        self.text.append(d)
+                    def get_data(self):
+                        return ''.join(self.text)
+                        
+                def strip_tags(html):
+                    s = MLStripper()
+                    s.feed(html)
+                    return s.get_data()
+                    
+                plain_text = strip_tags(memo['content'])
+                self.notion_helper.client.blocks.children.append(
+                    block_id=page['id'],
+                    children=[
+                        {
+                            "object": "block",
+                            "type": "paragraph",
+                            "paragraph": {
+                                "rich_text": [{"type": "text", "text": {"content": plain_text}}]
+                            }
+                        }
+                    ]
+                )
+        except Exception as e:
+            print(f"Error updating memo {memo['slug']}: {e}")
+            # 在这里可以添加重试逻辑或其他错误处理
+            raise
 
     # 具体步骤：
     # 1. 调用flomo web端的api从flomo获取数据
