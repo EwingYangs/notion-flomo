@@ -24,9 +24,7 @@ class NotionHelper:
         self.client = Client(
             auth=os.getenv("NOTION_TOKEN"),
             log_level=logging.ERROR,
-            client_kwargs={
-                "timeout": httpx.Timeout(60.0, read=300.0)  # 连接超时60秒，读取超时300秒
-            }
+            timeout_ms=300000  # 设置超时时间为300秒（300000毫秒）
         )
         self.page_id = extract_page_id(os.getenv("NOTION_PAGE"))
         self.__cache = {}
