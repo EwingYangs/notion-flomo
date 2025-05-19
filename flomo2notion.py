@@ -260,7 +260,6 @@ class Flomo2Notion:
                 logger.info(f"🗑️ 发现已删除记录 [slug: {memo['slug']}]")
         
         logger.info(f"📥 共有 {len(memo_list)} 条记录，其中 {len(deleted_memo_slugs)} 条已删除")
-        memo_list = filtered_memo_list
         
         # 2. 调用notion api获取数据库存在的记录，用slug标识唯一，如果存在则更新，不存在则写入
         logger.info("🔍 查询 Notion 数据库...")
