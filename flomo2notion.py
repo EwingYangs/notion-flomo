@@ -343,7 +343,7 @@ class Flomo2Notion:
             slug_map = {}
             for notion_memo in notion_memo_list:
                 slug_map[notion_utils.get_rich_text_from_result(notion_memo, "slug")] = notion_memo.get("id")
-            logger.info(f"🔍 Notion 数据库中已有 {len(slug_map)} 条记录")
+            # logger.info(f"🔍 Notion 数据库中已有 {len(slug_map)} 条记录")
         except Exception as e:
             logger.error(f"❌ 查询 Notion 数据库失败: {str(e)}")
             return
@@ -354,6 +354,7 @@ class Flomo2Notion:
         
         for i, memo in enumerate(memo_list):
             progress = f"[{i+1}/{total}]"
+            logger.info(f"{progress} 🔍 处理记录 - {memo['slug']}")
             # 3.1 判断memo的slug是否存在，不存在则写入
             # 3.2 防止大批量更新，只更新更新时间为制定时间的数据（默认为7天）
             if memo['slug'] in slug_map.keys():
