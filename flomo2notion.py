@@ -14,6 +14,11 @@ from notionify.notion_cover_list import cover
 from notionify.notion_helper import NotionHelper
 from utils import truncate_string, is_within_n_days
 
+
+# 禁用 notion_client 的日志
+logging.getLogger('notion_client').setLevel(logging.WARNING)
+logging.getLogger('notion_client.api_endpoints').setLevel(logging.WARNING)
+
 # 配置日志格式
 logging.basicConfig(
     level=logging.INFO,
