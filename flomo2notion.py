@@ -64,6 +64,13 @@ def split_long_text(text, max_length=1900):
         
     return chunks
 
+def clean_backticks(text):
+    """彻底清理字符串中的所有反引号和多余空格"""
+    if not text:
+        return ""
+    # 移除所有反引号和规范化空格
+    return text.replace('`', '').strip()
+
 class Flomo2Notion:
     def __init__(self):
         self.flomo_api = FlomoApi()
@@ -91,12 +98,24 @@ class Flomo2Notion:
                 logger.info(f"🖼️ 发现 {len(memo['files'])} 张图片")
                 for i, file in enumerate(memo['files']):
                     if file.get('url'):
-                        # 下载图片并获取本地路径
                         try:
-                            # 清理 URL 中的反引号和多余空格
-                            clean_url = file['url'].strip().strip('`')
-                            clean_name = file.get('name', '图片').strip().strip('`')
+                            # 使用新函数彻底清理 URL 和名称
+                            clean_url = clean_backticks(file['url'])
+                            clean_name = clean_backticks(file.get('name', '图片'))
                             logger.info(f"  - 处理图片 {i+1}/{len(memo['files'])}: {clean_name[:30]}...")
+                            
+                            # 添加图片块
+                            image_blocks.append({
+                                "type": "image",
+                                "image": {
+                                    "type": "external",
+                                    "external": {
+                                        "url": clean_url
+                                    }
+                                }
+                            })
+                            
+                            # 同时保留在 Markdown 中
                             content_md += f"![{clean_name}]({clean_url})\n\n"
                         except Exception as e:
                             logger.error(f"  ❌ 图片处理失败: {str(e)}")
