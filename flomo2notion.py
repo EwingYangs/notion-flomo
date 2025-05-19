@@ -95,7 +95,20 @@ class Flomo2Notion:
             
             # 在page里面添加content
             logger.info("🔄 上传内容到 Notion 页面...")
-            self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+            
+            # 检查内容长度，如果超过限制则分割
+            if len(content_md) > 2000:
+                logger.info(f"📏 内容长度为 {len(content_md)} 字符，超过 Notion API 限制，将进行分割")
+                content_chunks = split_long_text(content_md)
+                logger.info(f"📏 内容已分割为 {len(content_chunks)} 个块")
+                
+                # 逐块上传
+                for i, chunk in enumerate(content_chunks):
+                    logger.info(f"🔄 上传内容块 {i+1}/{len(content_chunks)}...")
+                    self.uploader.uploadSingleFileContent(self.notion_helper.client, chunk, page['id'])
+            else:
+                self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+                
             logger.info(f"✅ 记录 [slug: {memo['slug']}] 插入成功")
             self.success_count += 1
         except Exception as e:
@@ -153,7 +166,20 @@ class Flomo2Notion:
             self.notion_helper.clear_page_content(page["id"])
         
             logger.info("🔄 上传新内容...")
-            self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+            
+            # 检查内容长度，如果超过限制则分割
+            if len(content_md) > 2000:
+                logger.info(f"📏 内容长度为 {len(content_md)} 字符，超过 Notion API 限制，将进行分割")
+                content_chunks = split_long_text(content_md)
+                logger.info(f"📏 内容已分割为 {len(content_chunks)} 个块")
+                
+                # 逐块上传
+                for i, chunk in enumerate(content_chunks):
+                    logger.info(f"🔄 上传内容块 {i+1}/{len(content_chunks)}...")
+                    self.uploader.uploadSingleFileContent(self.notion_helper.client, chunk, page['id'])
+            else:
+                self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+                
             logger.info(f"✅ 记录 [slug: {memo['slug']}] 更新成功")
             self.success_count += 1
         except Exception as e:
@@ -250,3 +276,44 @@ if __name__ == "__main__":
 
     # notionify key
     # secret_IHWKSLUTqUh3A8TIKkeXWePu3PucwHiRwDEcqNp5uT3
+
+
+def split_long_text(text, max_length=1900):
+    """
+    将长文本分割成多个小块，每个块不超过指定的最大长度
+    
+    Args:
+        text (str): 要分割的文本
+        max_length (int): 每个块的最大长度，默认为1900（留出一些余量）
+        
+    Returns:
+        list: 分割后的文本块列表
+    """
+    if not text or len(text) <= max_length:
+        return [text]
+        
+    chunks = []
+    current_pos = 0
+    text_length = len(text)
+    
+    while current_pos < text_length:
+        # 如果剩余文本长度小于等于最大长度，直接添加
+        if current_pos + max_length >= text_length:
+            chunks.append(text[current_pos:])
+            break
+            
+        # 尝试在最大长度位置附近找到一个合适的分割点（如句号、换行符等）
+        end_pos = current_pos + max_length
+        
+        # 优先在句号、问号、感叹号、换行符处分割
+        for char in ['\n', '。', '！', '？', '.', '!', '?']:
+            last_char_pos = text.rfind(char, current_pos, end_pos)
+            if last_char_pos != -1 and last_char_pos > current_pos:
+                end_pos = last_char_pos + 1
+                break
+                
+        # 如果没找到合适的分割点，就在最大长度处直接分割
+        chunks.append(text[current_pos:end_pos])
+        current_pos = end_pos
+        
+    return chunks
