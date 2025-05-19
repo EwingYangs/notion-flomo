@@ -71,6 +71,23 @@ def clean_backticks(text):
     # 移除所有反引号和规范化空格
     return text.replace('`', '').strip()
 
+def mask_sensitive_info(text, mask_length=4):
+    """
+    对敏感信息进行脱敏处理
+    
+    Args:
+        text (str): 需要脱敏的文本
+        mask_length (int): 保留的字符数量
+        
+    Returns:
+        str: 脱敏后的文本
+    """
+    if not text or len(text) <= mask_length:
+        return text
+        
+    # 保留前几个字符，其余用*代替
+    return text[:mask_length] + '*' * (len(text) - mask_length)
+
 class Flomo2Notion:
     def __init__(self):
         self.flomo_api = FlomoApi()
@@ -83,11 +100,8 @@ class Flomo2Notion:
     def insert_memo(self, memo):
         # 检查记录是否已删除
         if memo.get('deleted_at') is not None:
-            logger.info(f"🗑️ 跳过已删除记录 [slug: {memo['slug']}]")
             self.skip_count += 1
             return
-        
-        logger.info(f"📝 开始插入记录 [slug: {memo['slug']}]")
         
         # 处理 None 内容
         image_blocks = []
@@ -95,14 +109,12 @@ class Flomo2Notion:
             # 如果有文件，将它们作为内容
             if memo.get('files') and len(memo['files']) > 0:
                 content_md = "# 图片备忘录\n\n"
-                logger.info(f"🖼️ 发现 {len(memo['files'])} 张图片")
                 for i, file in enumerate(memo['files']):
                     if file.get('url'):
                         try:
                             # 使用新函数彻底清理 URL 和名称
                             clean_url = clean_backticks(file['url'])
                             clean_name = clean_backticks(file.get('name', '图片'))
-                            logger.info(f"  - 处理图片 {i+1}/{len(memo['files'])}: {clean_name[:30]}...")
                             
                             # 添加图片块
                             image_blocks.append({
@@ -118,15 +130,13 @@ class Flomo2Notion:
                             # 同时保留在 Markdown 中
                             content_md += f"![{clean_name}]({clean_url})\n\n"
                         except Exception as e:
-                            logger.error(f"  ❌ 图片处理失败: {str(e)}")
+                            logger.error(f"❌ 图片处理失败: {str(e)}")
             else:
                 content_md = ""  # 如果没有文件则为空内容
-                logger.info("📄 空内容记录")
             content_text = content_md
         else:
             content_md = markdownify(memo['content'])
             content_text = html2text.html2text(memo['content'])
-            logger.info(f"📄 文本内容长度: {len(content_text)} 字符")
         
         parent = {"database_id": self.notion_helper.page_id, "type": "database_id"}
         properties = {
@@ -148,10 +158,8 @@ class Flomo2Notion:
         }
     
         random_cover = random.choice(cover)
-        logger.debug(f"🖼️ 选择封面: {random_cover}")
     
         try:
-            logger.info("🔄 创建 Notion 页面...")
             page = self.notion_helper.client.pages.create(
                 parent=parent,
                 icon=notion_utils.get_icon("https://www.notion.so/icons/target_red.svg"),
@@ -159,18 +167,12 @@ class Flomo2Notion:
                 properties=properties,
             )
             
-            # 在page里面添加content
-            logger.info("🔄 上传内容到 Notion 页面...")
-            
             # 检查内容长度，如果超过限制则分割
             if len(content_md) > 2000:
-                logger.info(f"📏 内容长度为 {len(content_md)} 字符，超过 Notion API 限制，将进行分割")
                 content_chunks = split_long_text(content_md)
-                logger.info(f"📏 内容已分割为 {len(content_chunks)} 个块")
                 
                 # 逐块上传
                 for i, chunk in enumerate(content_chunks):
-                    logger.info(f"🔄 上传内容块 {i+1}/{len(content_chunks)}...")
                     self.uploader.uploadSingleFileContent(self.notion_helper.client, chunk, page['id'])
             else:
                 self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
@@ -178,7 +180,6 @@ class Flomo2Notion:
             # 在上传完内容后添加图片块
             if image_blocks and len(image_blocks) > 0:
                 try:
-                    logger.info(f"🖼️ 添加 {len(image_blocks)} 个图片块...")
                     self.notion_helper.client.blocks.children.append(
                         block_id=page['id'],
                         children=image_blocks
@@ -186,32 +187,27 @@ class Flomo2Notion:
                 except Exception as e:
                     logger.error(f"❌ 添加图片块失败: {str(e)}")
             
-            logger.info(f"✅ 记录 [slug: {memo['slug']}] 插入成功")
             self.success_count += 1
         except Exception as e:
-            logger.error(f"❌ 记录 [slug: {memo['slug']}] 插入失败: {str(e)}")
+            logger.error(f"❌ 记录插入失败: {str(e)}")
             self.error_count += 1
             raise
 
     def update_memo(self, memo, page_id):
         # 检查记录是否已删除
         if memo.get('deleted_at') is not None:
-            logger.info(f"🗑️ 处理已删除记录 [slug: {memo['slug']}]")
             try:
                 # 将 Notion 页面归档（相当于删除）
                 self.notion_helper.client.pages.update(
                     page_id=page_id,
                     archived=True
                 )
-                logger.info(f"✅ 记录 [slug: {memo['slug']}] 已在 Notion 中归档")
                 self.success_count += 1
                 return
             except Exception as e:
-                logger.error(f"❌ 归档记录失败 [slug: {memo['slug']}]: {str(e)}")
+                logger.error(f"❌ 归档记录失败: {str(e)}")
                 self.error_count += 1
                 raise
-        
-        logger.info(f"🔄 开始更新记录 [slug: {memo['slug']}]")
         
         # 处理 None 内容
         image_blocks = []
@@ -219,7 +215,6 @@ class Flomo2Notion:
             # 如果有文件，将它们作为内容
             if memo.get('files') and len(memo['files']) > 0:
                 content_md = "# 图片备忘录\n\n"
-                logger.info(f"🖼️ 发现 {len(memo['files'])} 张图片")
                 
                 # 创建图片块列表
                 for i, file in enumerate(memo['files']):
@@ -228,7 +223,6 @@ class Flomo2Notion:
                             # 使用新函数彻底清理 URL 和名称
                             clean_url = clean_backticks(file['url'])
                             clean_name = clean_backticks(file.get('name', '图片'))
-                            logger.info(f"  - 处理图片 {i+1}/{len(memo['files'])}: {clean_name[:30]}...")
                             
                             # 添加图片块
                             image_blocks.append({
@@ -244,15 +238,13 @@ class Flomo2Notion:
                             # 同时保留在 Markdown 中，以防块创建失败
                             content_md += f"![{clean_name}]({clean_url})\n\n"
                         except Exception as e:
-                            logger.error(f"  ❌ 图片处理失败: {str(e)}")
+                            logger.error(f"❌ 图片处理失败: {str(e)}")
             else:
                 content_md = ""  # 如果没有文件则为空内容
-                logger.info("📄 空内容记录")
-            content_text = content_md  # 添加这一行
+            content_text = content_md
         else:
             content_md = markdownify(memo['content'])
             content_text = html2text.html2text(memo['content'])
-            logger.info(f"📄 文本内容长度: {len(content_text)} 字符")
         
         # 只更新内容
         properties = {
@@ -268,24 +260,17 @@ class Flomo2Notion:
         }
         
         try:
-            logger.info("🔄 更新 Notion 页面属性...")
             page = self.notion_helper.client.pages.update(page_id=page_id, properties=properties)
         
             # 先清空page的内容，再重新写入
-            logger.info("🔄 清空页面内容...")
             self.notion_helper.clear_page_content(page["id"])
         
-            logger.info("🔄 上传新内容...")
-            
             # 检查内容长度，如果超过限制则分割
             if len(content_md) > 2000:
-                logger.info(f"📏 内容长度为 {len(content_md)} 字符，超过 Notion API 限制，将进行分割")
                 content_chunks = split_long_text(content_md)
-                logger.info(f"📏 内容已分割为 {len(content_chunks)} 个块")
                 
                 # 逐块上传
                 for i, chunk in enumerate(content_chunks):
-                    logger.info(f"🔄 上传内容块 {i+1}/{len(content_chunks)}...")
                     self.uploader.uploadSingleFileContent(self.notion_helper.client, chunk, page['id'])
             else:
                 self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
@@ -293,7 +278,6 @@ class Flomo2Notion:
             # 在上传完内容后添加图片块
             if image_blocks and len(image_blocks) > 0:
                 try:
-                    logger.info(f"🖼️ 添加 {len(image_blocks)} 个图片块...")
                     self.notion_helper.client.blocks.children.append(
                         block_id=page['id'],
                         children=image_blocks
@@ -301,10 +285,9 @@ class Flomo2Notion:
                 except Exception as e:
                     logger.error(f"❌ 添加图片块失败: {str(e)}")
                 
-            logger.info(f"✅ 记录 [slug: {memo['slug']}] 更新成功")
             self.success_count += 1
         except Exception as e:
-            logger.error(f"❌ 记录 [slug: {memo['slug']}] 更新失败: {str(e)}")
+            logger.error(f"❌ 记录更新失败: {str(e)}")
             self.error_count += 1
             raise
 
@@ -337,25 +320,11 @@ class Flomo2Notion:
                 logger.error(f"❌ 获取 Flomo 数据失败: {str(e)}")
                 return
         
-        # 打印每个 memo 的详细信息（除了 content）
-        logger.info("📋 Memo 详细信息:")
-        for i, memo in enumerate(memo_list):
-            # 创建一个不包含 content 的 memo 副本
-            memo_info = memo.copy()
-            if 'content' in memo_info:
-                memo_info['content'] = f"[内容长度: {len(str(memo_info['content']))}]"
-            
-            logger.info(f"记录 {i+1}/{len(memo_list)}:")
-            for key, value in memo_info.items():
-                logger.info(f"  - {key}: {value}")
-            logger.info("---")
-        
         # 不要过滤掉已删除的记录，而是记录它们
         deleted_memo_slugs = set()
         for memo in memo_list:
             if memo.get('deleted_at') is not None:
                 deleted_memo_slugs.add(memo['slug'])
-                logger.info(f"🗑️ 发现已删除记录 [slug: {memo['slug']}]")
         
         logger.info(f"📥 共有 {len(memo_list)} 条记录，其中 {len(deleted_memo_slugs)} 条已删除")
         
@@ -382,23 +351,26 @@ class Flomo2Notion:
             if memo['slug'] in slug_map.keys():
                 # 是否全量更新，默认否
                 full_update = os.getenv("FULL_UPDATE", False)
-                interval_day = os.getenv("UPDATE_INTERVAL_DAY", 7)
+                interval_day = os.getenv("UPDATE_INTERVAL_DAY", 3)
                 if not full_update and not is_within_n_days(memo['updated_at'], interval_day):
-                    logger.info(f"{progress} ⏭️ 跳过记录 [slug: {memo['slug']}] - 更新时间超过 {interval_day} 天")
+                    logger.info(f"{progress} ⏭️ 跳过记录 - 更新时间超过 {interval_day} 天")
                     self.skip_count += 1
                     continue
 
                 try:
                     page_id = slug_map[memo['slug']]
+                    logger.info(f"{progress} 🔄 更新记录")
                     self.update_memo(memo, page_id)
+                    logger.info(f"{progress} ✅ 更新成功")
                 except Exception as e:
-                    logger.error(f"{progress} ❌ 更新记录失败 [slug: {memo['slug']}]: {str(e)}")
+                    logger.error(f"{progress} ❌ 更新失败: {str(e)}")
             else:
                 try:
-                    logger.info(f"{progress} 📝 新记录 [slug: {memo['slug']}]")
+                    logger.info(f"{progress} 📝 新记录")
                     self.insert_memo(memo)
+                    logger.info(f"{progress} ✅ 插入成功")
                 except Exception as e:
-                    logger.error(f"{progress} ❌ 插入记录失败 [slug: {memo['slug']}]: {str(e)}")
+                    logger.error(f"{progress} ❌ 插入失败: {str(e)}")
         
         end_time = time.time()
         duration = end_time - start_time
