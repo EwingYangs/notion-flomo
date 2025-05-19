@@ -211,6 +211,7 @@ class Flomo2Notion:
                     archived=True
                 )
                 self.success_count += 1
+                logger.info(f"✅ 归档记录成功: {memo['slug']}")
                 return
             except Exception as e:
                 logger.error(f"❌ 归档记录失败: {str(e)}")
