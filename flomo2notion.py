@@ -225,9 +225,9 @@ class Flomo2Notion:
                 for i, file in enumerate(memo['files']):
                     if file.get('url'):
                         try:
-                            # 清理 URL 中的反引号和多余空格
-                            clean_url = file['url'].strip().strip('`')
-                            clean_name = file.get('name', '图片').strip().strip('`')
+                            # 使用新函数彻底清理 URL 和名称
+                            clean_url = clean_backticks(file['url'])
+                            clean_name = clean_backticks(file.get('name', '图片'))
                             logger.info(f"  - 处理图片 {i+1}/{len(memo['files'])}: {clean_name[:30]}...")
                             
                             # 添加图片块
@@ -246,9 +246,13 @@ class Flomo2Notion:
                         except Exception as e:
                             logger.error(f"  ❌ 图片处理失败: {str(e)}")
             else:
-                content_md = markdownify(memo['content'])
-                content_text = html2text.html2text(memo['content'])
-                logger.info(f"📄 文本内容长度: {len(content_text)} 字符")
+                content_md = ""  # 如果没有文件则为空内容
+                logger.info("📄 空内容记录")
+            content_text = content_md  # 添加这一行
+        else:
+            content_md = markdownify(memo['content'])
+            content_text = html2text.html2text(memo['content'])
+            logger.info(f"📄 文本内容长度: {len(content_text)} 字符")
         
         # 只更新内容
         properties = {
