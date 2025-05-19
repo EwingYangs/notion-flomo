@@ -21,9 +21,23 @@ class Flomo2Notion:
 
     def insert_memo(self, memo):
         print("insert_memo:", memo)
-        content_md = markdownify(memo['content'])
+        
+        # 处理 None 内容
+        if memo['content'] is None:
+            # 如果有文件，将它们作为内容
+            if memo.get('files') and len(memo['files']) > 0:
+                content_md = "# 图片备忘录\n\n"
+                for file in memo['files']:
+                    if file.get('url'):
+                        content_md += f"![{file.get('name', '图片')}]({file['url']})\n\n"
+            else:
+                content_md = ""  # 如果没有文件则为空内容
+            content_text = content_md
+        else:
+            content_md = markdownify(memo['content'])
+            content_text = html2text.html2text(memo['content'])
+        
         parent = {"database_id": self.notion_helper.page_id, "type": "database_id"}
-        content_text = html2text.html2text(memo['content'])
         properties = {
             "标题": notion_utils.get_title(
                 truncate_string(content_text)
@@ -41,26 +55,39 @@ class Flomo2Notion:
             "来源": notion_utils.get_select(memo['source']),
             "链接数量": notion_utils.get_number(memo['linked_count']),
         }
-
+    
         random_cover = random.choice(cover)
         print(f"Random element: {random_cover}")
-
+    
         page = self.notion_helper.client.pages.create(
             parent=parent,
             icon=notion_utils.get_icon("https://www.notion.so/icons/target_red.svg"),
             cover=notion_utils.get_icon(random_cover),
             properties=properties,
         )
-
+    
         # 在page里面添加content
         self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
 
     def update_memo(self, memo, page_id):
         print("update_memo:", memo)
-
-        content_md = markdownify(memo['content'])
+    
+        # 处理 None 内容
+        if memo['content'] is None:
+            # 如果有文件，将它们作为内容
+            if memo.get('files') and len(memo['files']) > 0:
+                content_md = "# 图片备忘录\n\n"
+                for file in memo['files']:
+                    if file.get('url'):
+                        content_md += f"![{file.get('name', '图片')}]({file['url']})\n\n"
+            else:
+                content_md = ""  # 如果没有文件则为空内容
+            content_text = content_md
+        else:
+            content_md = markdownify(memo['content'])
+            content_text = html2text.html2text(memo['content'])
+        
         # 只更新内容
-        content_text = html2text.html2text(memo['content'])
         properties = {
             "标题": notion_utils.get_title(
                 truncate_string(content_text)
@@ -73,10 +100,10 @@ class Flomo2Notion:
             "是否置顶": notion_utils.get_select("否" if memo['pin'] == 0 else "是"),
         }
         page = self.notion_helper.client.pages.update(page_id=page_id, properties=properties)
-
+    
         # 先清空page的内容，再重新写入
         self.notion_helper.clear_page_content(page["id"])
-
+    
         self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
 
     # 具体步骤：
