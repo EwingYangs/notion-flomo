@@ -15,9 +15,12 @@ from notionify.notion_helper import NotionHelper
 from utils import truncate_string, is_within_n_days
 
 
-# 禁用 notion_client 的日志
-logging.getLogger('notion_client').setLevel(logging.WARNING)
-logging.getLogger('notion_client.api_endpoints').setLevel(logging.WARNING)
+# 禁用所有第三方库的日志
+logging.getLogger('notion_client').setLevel(logging.ERROR)  # 提高到 ERROR 级别
+logging.getLogger('notion_client.api_endpoints').setLevel(logging.ERROR)  # 提高到 ERROR 级别
+logging.getLogger('urllib3').setLevel(logging.ERROR)  # 禁用 urllib3 日志
+logging.getLogger('requests').setLevel(logging.ERROR)  # 禁用 requests 日志
+logging.getLogger('httpx').setLevel(logging.ERROR)  # 禁用 httpx 日志
 
 # 配置日志格式
 logging.basicConfig(
