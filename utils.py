@@ -1,7 +1,6 @@
 import calendar
 import re
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pendulum
 
@@ -89,15 +88,25 @@ def truncate_string(s, length=30):
 
 def is_within_n_days(date_str, n_days):
     """
-    判断给定日期是否在当前日期的n天内，考虑东八区时差
-    """
-    from datetime import datetime, timedelta
+    判断给定日期是否在当前日期的n天内
     
-    # 解析日期字符串
+    Args:
+        date_str (str): 日期字符串，格式为 "YYYY-MM-DD HH:MM:SS"，东八区时间
+        n_days (int): 天数
+        
+    Returns:
+        bool: 如果在n天内，返回True，否则返回False
+    """    
+    
+    # 解析日期字符串（假设是东八区时间）
     date = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
     
-    # 获取当前日期（本地时间）
-    now = datetime.now()
+    # 将日期转换为带时区的日期（东八区，UTC+8）
+    tz_offset = timezone(timedelta(hours=8))
+    date = date.replace(tzinfo=tz_offset)
+    
+    # 获取当前日期（东八区）
+    now = datetime.now(tz_offset)
     
     # 计算时间差
     delta = now - date
