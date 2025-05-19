@@ -355,7 +355,7 @@ class Flomo2Notion:
         
         for i, memo in enumerate(memo_list):
             progress = f"[{i+1}/{total}]"
-            logger.info(f"{progress} 🔍 处理记录 - {memo['slug']}")
+            # logger.info(f"{progress} 🔍 处理记录 - {memo['slug']}")
             # 3.1 判断memo的slug是否存在，不存在则写入
             # 3.2 防止大批量更新，只更新更新时间为制定时间的数据（默认为1天）
             if memo['slug'] in slug_map.keys():
