@@ -83,6 +83,7 @@ class Flomo2Notion:
         logger.info(f"📝 开始插入记录 [slug: {memo['slug']}]")
         
         # 处理 None 内容
+        image_blocks = []
         if memo['content'] is None:
             # 如果有文件，将它们作为内容
             if memo.get('files') and len(memo['files']) > 0:
@@ -155,6 +156,17 @@ class Flomo2Notion:
             else:
                 self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
                 
+            # 在上传完内容后添加图片块
+            if image_blocks and len(image_blocks) > 0:
+                try:
+                    logger.info(f"🖼️ 添加 {len(image_blocks)} 个图片块...")
+                    self.notion_helper.client.blocks.children.append(
+                        block_id=page['id'],
+                        children=image_blocks
+                    )
+                except Exception as e:
+                    logger.error(f"❌ 添加图片块失败: {str(e)}")
+            
             logger.info(f"✅ 记录 [slug: {memo['slug']}] 插入成功")
             self.success_count += 1
         except Exception as e:
@@ -183,11 +195,14 @@ class Flomo2Notion:
         logger.info(f"🔄 开始更新记录 [slug: {memo['slug']}]")
         
         # 处理 None 内容
+        image_blocks = []
         if memo['content'] is None:
             # 如果有文件，将它们作为内容
             if memo.get('files') and len(memo['files']) > 0:
                 content_md = "# 图片备忘录\n\n"
                 logger.info(f"🖼️ 发现 {len(memo['files'])} 张图片")
+                
+                # 创建图片块列表
                 for i, file in enumerate(memo['files']):
                     if file.get('url'):
                         try:
@@ -195,17 +210,26 @@ class Flomo2Notion:
                             clean_url = file['url'].strip().strip('`')
                             clean_name = file.get('name', '图片').strip().strip('`')
                             logger.info(f"  - 处理图片 {i+1}/{len(memo['files'])}: {clean_name[:30]}...")
+                            
+                            # 添加图片块
+                            image_blocks.append({
+                                "type": "image",
+                                "image": {
+                                    "type": "external",
+                                    "external": {
+                                        "url": clean_url
+                                    }
+                                }
+                            })
+                            
+                            # 同时保留在 Markdown 中，以防块创建失败
                             content_md += f"![{clean_name}]({clean_url})\n\n"
                         except Exception as e:
                             logger.error(f"  ❌ 图片处理失败: {str(e)}")
             else:
-                content_md = ""  # 如果没有文件则为空内容
-                logger.info("📄 空内容记录")
-            content_text = content_md
-        else:
-            content_md = markdownify(memo['content'])
-            content_text = html2text.html2text(memo['content'])
-            logger.info(f"📄 文本内容长度: {len(content_text)} 字符")
+                content_md = markdownify(memo['content'])
+                content_text = html2text.html2text(memo['content'])
+                logger.info(f"📄 文本内容长度: {len(content_text)} 字符")
         
         # 只更新内容
         properties = {
@@ -242,6 +266,17 @@ class Flomo2Notion:
                     self.uploader.uploadSingleFileContent(self.notion_helper.client, chunk, page['id'])
             else:
                 self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
+                
+            # 在上传完内容后添加图片块
+            if image_blocks and len(image_blocks) > 0:
+                try:
+                    logger.info(f"🖼️ 添加 {len(image_blocks)} 个图片块...")
+                    self.notion_helper.client.blocks.children.append(
+                        block_id=page['id'],
+                        children=image_blocks
+                    )
+                except Exception as e:
+                    logger.error(f"❌ 添加图片块失败: {str(e)}")
                 
             logger.info(f"✅ 记录 [slug: {memo['slug']}] 更新成功")
             self.success_count += 1
