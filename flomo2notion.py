@@ -24,6 +24,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger('flomo2notion')
 
+def split_long_text(text, max_length=1900):
+    """
+    将长文本分割成多个小块，每个块不超过指定的最大长度
+    
+    Args:
+        text (str): 要分割的文本
+        max_length (int): 每个块的最大长度，默认为1900（留出一些余量）
+        
+    Returns:
+        list: 分割后的文本块列表
+    """
+    if not text or len(text) <= max_length:
+        return [text]
+        
+    chunks = []
+    current_pos = 0
+    text_length = len(text)
+    
+    while current_pos < text_length:
+        # 如果剩余文本长度小于等于最大长度，直接添加
+        if current_pos + max_length >= text_length:
+            chunks.append(text[current_pos:])
+            break
+            
+        # 尝试在最大长度位置附近找到一个合适的分割点（如句号、换行符等）
+        end_pos = current_pos + max_length
+        
+        # 优先在句号、问号、感叹号、换行符处分割
+        for char in ['\n', '。', '！', '？', '.', '!', '?']:
+            last_char_pos = text.rfind(char, current_pos, end_pos)
+            if last_char_pos != -1 and last_char_pos > current_pos:
+                end_pos = last_char_pos + 1
+                break
+                
+        # 如果没找到合适的分割点，就在最大长度处直接分割
+        chunks.append(text[current_pos:end_pos])
+        current_pos = end_pos
+        
+    return chunks
+
 class Flomo2Notion:
     def __init__(self):
         self.flomo_api = FlomoApi()
@@ -321,44 +361,3 @@ if __name__ == "__main__":
 
     # notionify key
     # secret_IHWKSLUTqUh3A8TIKkeXWePu3PucwHiRwDEcqNp5uT3
-
-
-def split_long_text(text, max_length=1900):
-    """
-    将长文本分割成多个小块，每个块不超过指定的最大长度
-    
-    Args:
-        text (str): 要分割的文本
-        max_length (int): 每个块的最大长度，默认为1900（留出一些余量）
-        
-    Returns:
-        list: 分割后的文本块列表
-    """
-    if not text or len(text) <= max_length:
-        return [text]
-        
-    chunks = []
-    current_pos = 0
-    text_length = len(text)
-    
-    while current_pos < text_length:
-        # 如果剩余文本长度小于等于最大长度，直接添加
-        if current_pos + max_length >= text_length:
-            chunks.append(text[current_pos:])
-            break
-            
-        # 尝试在最大长度位置附近找到一个合适的分割点（如句号、换行符等）
-        end_pos = current_pos + max_length
-        
-        # 优先在句号、问号、感叹号、换行符处分割
-        for char in ['\n', '。', '！', '？', '.', '!', '?']:
-            last_char_pos = text.rfind(char, current_pos, end_pos)
-            if last_char_pos != -1 and last_char_pos > current_pos:
-                end_pos = last_char_pos + 1
-                break
-                
-        # 如果没找到合适的分割点，就在最大长度处直接分割
-        chunks.append(text[current_pos:end_pos])
-        current_pos = end_pos
-        
-    return chunks
