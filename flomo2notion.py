@@ -34,6 +34,12 @@ class Flomo2Notion:
         self.skip_count = 0
 
     def insert_memo(self, memo):
+        # 检查记录是否已删除
+        if memo.get('deleted_at') is not None:
+            logger.info(f"🗑️ 跳过已删除记录 [slug: {memo['slug']}]")
+            self.skip_count += 1
+            return
+        
         logger.info(f"📝 开始插入记录 [slug: {memo['slug']}]")
         
         # 处理 None 内容
@@ -117,8 +123,25 @@ class Flomo2Notion:
             raise
 
     def update_memo(self, memo, page_id):
+        # 检查记录是否已删除
+        if memo.get('deleted_at') is not None:
+            logger.info(f"🗑️ 处理已删除记录 [slug: {memo['slug']}]")
+            try:
+                # 将 Notion 页面归档（相当于删除）
+                self.notion_helper.client.pages.update(
+                    page_id=page_id,
+                    archived=True
+                )
+                logger.info(f"✅ 记录 [slug: {memo['slug']}] 已在 Notion 中归档")
+                self.success_count += 1
+                return
+            except Exception as e:
+                logger.error(f"❌ 归档记录失败 [slug: {memo['slug']}]: {str(e)}")
+                self.error_count += 1
+                raise
+        
         logger.info(f"🔄 开始更新记录 [slug: {memo['slug']}]")
-    
+        
         # 处理 None 内容
         if memo['content'] is None:
             # 如果有文件，将它们作为内容
@@ -215,7 +238,7 @@ class Flomo2Notion:
             except Exception as e:
                 logger.error(f"❌ 获取 Flomo 数据失败: {str(e)}")
                 return
-    
+        
         # 打印每个 memo 的详细信息（除了 content）
         logger.info("📋 Memo 详细信息:")
         for i, memo in enumerate(memo_list):
@@ -228,6 +251,16 @@ class Flomo2Notion:
             for key, value in memo_info.items():
                 logger.info(f"  - {key}: {value}")
             logger.info("---")
+        
+        # 不要过滤掉已删除的记录，而是记录它们
+        deleted_memo_slugs = set()
+        for memo in memo_list:
+            if memo.get('deleted_at') is not None:
+                deleted_memo_slugs.add(memo['slug'])
+                logger.info(f"🗑️ 发现已删除记录 [slug: {memo['slug']}]")
+        
+        logger.info(f"📥 共有 {len(memo_list)} 条记录，其中 {len(deleted_memo_slugs)} 条已删除")
+        memo_list = filtered_memo_list
         
         # 2. 调用notion api获取数据库存在的记录，用slug标识唯一，如果存在则更新，不存在则写入
         logger.info("🔍 查询 Notion 数据库...")
