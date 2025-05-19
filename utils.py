@@ -87,15 +87,32 @@ def truncate_string(s, length=30):
     return s[:end_pos]
 
 
-def is_within_n_days(target_date_str, n):
-    # 将目标日期字符串转换为 datetime 对象
-    target_date = datetime.strptime(target_date_str, '%Y-%m-%d %H:%M:%S')
-
-    # 获取当前时间
-    now = datetime.now()
-
-    # 计算 n 天前的时间
-    n_days_ago = now - timedelta(days=n)
-
-    # 判断目标日期是否在 n 天内
-    return n_days_ago <= target_date <= now
+def is_within_n_days(date_str, n_days):
+    """
+    判断给定日期是否在当前日期的n天内
+    
+    Args:
+        date_str (str): 日期字符串，格式为 "YYYY-MM-DD HH:MM:SS"
+        n_days (int): 天数
+        
+    Returns:
+        bool: 如果在n天内，返回True，否则返回False
+    """
+    from datetime import datetime, timedelta, timezone
+    import pytz
+    
+    # 解析日期字符串（假设是UTC时间）
+    date = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+    
+    # 将日期转换为带时区的日期（UTC）
+    date = date.replace(tzinfo=timezone.utc)
+    
+    # 获取当前日期（东八区）
+    china_tz = pytz.timezone('Asia/Shanghai')
+    now = datetime.now(china_tz)
+    
+    # 计算时间差
+    delta = now - date
+    
+    # 判断是否在n天内
+    return delta.days <= n_days
