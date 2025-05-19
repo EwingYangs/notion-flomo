@@ -29,7 +29,10 @@ class Flomo2Notion:
                 content_md = "# 图片备忘录\n\n"
                 for file in memo['files']:
                     if file.get('url'):
-                        content_md += f"![{file.get('name', '图片')}]({file['url']})\n\n"
+                        # 清理 URL 中的反引号和多余空格
+                        clean_url = file['url'].strip().strip('`')
+                        clean_name = file.get('name', '图片').strip().strip('`')
+                        content_md += f"![{clean_name}]({clean_url})\n\n"
             else:
                 content_md = ""  # 如果没有文件则为空内容
             content_text = content_md
