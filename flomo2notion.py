@@ -229,17 +229,17 @@ class Flomo2Notion:
                 logger.info(f"  - {key}: {value}")
             logger.info("---")
         
-            # 2. 调用notion api获取数据库存在的记录，用slug标识唯一，如果存在则更新，不存在则写入
-            logger.info("🔍 查询 Notion 数据库...")
-            try:
-                notion_memo_list = self.notion_helper.query_all(self.notion_helper.page_id)
-                slug_map = {}
-                for notion_memo in notion_memo_list:
-                    slug_map[notion_utils.get_rich_text_from_result(notion_memo, "slug")] = notion_memo.get("id")
-                logger.info(f"🔍 Notion 数据库中已有 {len(slug_map)} 条记录")
-            except Exception as e:
-                logger.error(f"❌ 查询 Notion 数据库失败: {str(e)}")
-                return
+        # 2. 调用notion api获取数据库存在的记录，用slug标识唯一，如果存在则更新，不存在则写入
+        logger.info("🔍 查询 Notion 数据库...")
+        try:
+            notion_memo_list = self.notion_helper.query_all(self.notion_helper.page_id)
+            slug_map = {}
+            for notion_memo in notion_memo_list:
+                slug_map[notion_utils.get_rich_text_from_result(notion_memo, "slug")] = notion_memo.get("id")
+            logger.info(f"🔍 Notion 数据库中已有 {len(slug_map)} 条记录")
+        except Exception as e:
+            logger.error(f"❌ 查询 Notion 数据库失败: {str(e)}")
+            return
 
         # 3. 轮询flomo的列表数据
         total = len(memo_list)
