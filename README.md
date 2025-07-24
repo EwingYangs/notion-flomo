@@ -1,8 +1,8 @@
 # 官网开启一键同步
 
-如果你觉得部署繁琐，可以直接使用NotesToNotion
-NotesToNotion能同步图片，并且删除和更新的也可以同步
-[NotesToNotion](https://notes2notion.notionify.net)
+如果你觉得部署繁琐，可以直接使用FlomoToNotion
+FlomoToNotion能同步图片，并且删除和更新的也可以同步
+[FlomoToNotion](https://blog.notionedu.com/article/23a73415-a279-802f-a5bd-f15b1b5a8622)
 
 # 将flomo同步到Notion
 
