@@ -20,7 +20,7 @@ class Flomo2Notion:
         self.uploader = Md2NotionUploader()
 
     def insert_memo(self, memo):
-        print("insert_memo:", memo)
+        print(f"insert_memo: slug={memo['slug']}")
         content_md = markdownify(memo['content'])
         parent = {"database_id": self.notion_helper.page_id, "type": "database_id"}
         content_text = html2text.html2text(memo['content'])
@@ -56,7 +56,7 @@ class Flomo2Notion:
         self.uploader.uploadSingleFileContent(self.notion_helper.client, content_md, page['id'])
 
     def update_memo(self, memo, page_id):
-        print("update_memo:", memo)
+        print(f"update_memo: slug={memo['slug']}")
 
         content_md = markdownify(memo['content'])
         # 只更新内容
@@ -110,7 +110,7 @@ class Flomo2Notion:
                 full_update = os.getenv("FULL_UPDATE", False)
                 interval_day = os.getenv("UPDATE_INTERVAL_DAY", 7)
                 if not full_update and not is_within_n_days(memo['updated_at'], interval_day):
-                    print("is_within_n_days slug:", memo['slug'])
+                    print(f"skip_memo: slug={memo['slug']} (not within update interval)")
                     continue
 
                 page_id = slug_map[memo['slug']]

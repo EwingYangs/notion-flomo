@@ -1,6 +1,7 @@
 import re, os
 from dotenv import load_dotenv
 from notion_client import Client
+from retrying import retry
 from notionify.Parser.md2block import read_file, read_file_content
 
 
@@ -274,6 +275,7 @@ class Md2NotionUploader:
                            }
                  }]
 
+    @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def uploadBlock(self, blockDescriptor, notion, page_id, mdFilePath=None, imagePathFunc=None):
         """
         Uploads a single blockDescriptor for NotionPyRenderer as the child of another block

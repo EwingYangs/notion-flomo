@@ -18,6 +18,25 @@ class NotionHelper:
         self.client = Client(auth=os.getenv("NOTION_TOKEN"), log_level=logging.ERROR)
         self.page_id = extract_page_id(os.getenv("NOTION_PAGE"))
         self.__cache = {}
+        self.__data_source_cache = {}  # 缓存 database_id -> data_source_id 的映射
+
+    @retry(stop_max_attempt_number=3, wait_fixed=5000)
+    def get_data_source_id(self, database_id):
+        """从 database_id 获取 data_source_id（新 API 需要）"""
+        if database_id in self.__data_source_cache:
+            return self.__data_source_cache[database_id]
+
+        # 调用 databases.retrieve 获取数据库信息，其中包含 data_sources
+        response = self.client.databases.retrieve(database_id=database_id)
+        data_sources = response.get("data_sources", [])
+
+        if data_sources:
+            data_source_id = data_sources[0].get("id")
+            self.__data_source_cache[database_id] = data_source_id
+            return data_source_id
+
+        # 如果没有 data_sources，可能是旧版本 API，直接返回 database_id
+        return database_id
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def clear_page_content(self, page_id):
@@ -56,7 +75,12 @@ class NotionHelper:
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def query(self, **kwargs):
         kwargs = {k: v for k, v in kwargs.items() if v}
-        return self.client.databases.query(**kwargs)
+        # 新 API：将 database_id 转换为 data_source_id
+        if "database_id" in kwargs:
+            database_id = kwargs.pop("database_id")
+            data_source_id = self.get_data_source_id(database_id)
+            kwargs["data_source_id"] = data_source_id
+        return self.client.data_sources.query(**kwargs)
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def get_block_children(self, id):
@@ -80,12 +104,15 @@ class NotionHelper:
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def query_all(self, database_id):
         """获取database中所有的数据"""
+        # 新 API：将 database_id 转换为 data_source_id
+        data_source_id = self.get_data_source_id(database_id)
+
         results = []
         has_more = True
         start_cursor = None
         while has_more:
-            response = self.client.databases.query(
-                database_id=database_id,
+            response = self.client.data_sources.query(
+                data_source_id=data_source_id,
                 start_cursor=start_cursor,
                 page_size=100,
             )
